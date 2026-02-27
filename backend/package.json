@@ -1,0 +1,15 @@
+{
+  "name": "okicom-salesforce-backend",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "main": "src/handler.mjs",
+  "scripts": {
+    "build": "npm ci --omit=dev",
+    "start": "node src/handler.mjs"
+  },
+  "dependencies": {
+    "@aws-sdk/client-bedrock-runtime": "^3.998.0",
+    "@smithy/node-http-handler": "^4.4.5"
+  }
+}

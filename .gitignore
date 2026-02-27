@@ -42,3 +42,9 @@ __screenshots__/
 .env
 .env.local
 .env.*.local
+
+# SAM backend build artifacts
+backend/.aws-sam/
+backend node_modules
+backend function.zip
+

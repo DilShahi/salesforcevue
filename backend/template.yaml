@@ -1,0 +1,110 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: Salesforce + Bedrock backend for Vue frontend
+
+Parameters:
+  FrontendOrigin:
+    Type: String
+    Description: Allowed frontend origin(s), comma-separated. Example: https://d285cc6tcbx9xj.cloudfront.net
+  SalesforceLoginUrl:
+    Type: String
+    Default: https://login.salesforce.com
+  SalesforceClientId:
+    Type: String
+  SalesforceClientSecret:
+    Type: String
+    NoEcho: true
+  SalesforceRedirectUri:
+    Type: String
+  AwsDefaultRegion:
+    Type: String
+  AwsAccessKeyId:
+    Type: String
+    Default: ''
+  AwsSecretAccessKey:
+    Type: String
+    Default: ''
+    NoEcho: true
+  BedrockModelId:
+    Type: String
+  BedrockMaxTokens:
+    Type: Number
+    Default: 32000
+  BedrockTemperature:
+    Type: Number
+    Default: 1
+  BedrockTopK:
+    Type: Number
+    Default: 250
+  BedrockConnectTimeout:
+    Type: Number
+    Default: 30
+  BedrockRequestTimeout:
+    Type: Number
+    Default: 300
+  BedrockRetries:
+    Type: Number
+    Default: 2
+  BedrockMaxEvents:
+    Type: Number
+    Default: 500
+  BedrockMaxPromptChars:
+    Type: Number
+    Default: 80000
+  BedrockChunkSize:
+    Type: Number
+    Default: 50
+
+Globals:
+  Function:
+    Runtime: nodejs20.x
+    Timeout: 900
+    MemorySize: 1024
+    Architectures:
+      - arm64
+
+Resources:
+  BackendApiFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: ./
+      Handler: src/handler.handler
+      Description: Handles Salesforce OAuth/data proxy and Bedrock event summaries.
+      Policies:
+        - AWSLambdaBasicExecutionRole
+        - Statement:
+            - Effect: Allow
+              Action:
+                - bedrock:InvokeModel
+              Resource: '*'
+      Environment:
+        Variables:
+          FRONTEND_ORIGIN: !Ref FrontendOrigin
+          SF_LOGIN_URL: !Ref SalesforceLoginUrl
+          SF_CLIENT_ID: !Ref SalesforceClientId
+          SF_CLIENT_SECRET: !Ref SalesforceClientSecret
+          SF_REDIRECT_URI: !Ref SalesforceRedirectUri
+          AWS_DEFAULT_REGION: !Ref AwsDefaultRegion
+          AWS_ACCESS_KEY_ID: !Ref AwsAccessKeyId
+          AWS_SECRET_ACCESS_KEY: !Ref AwsSecretAccessKey
+          BEDROCK_MODEL_ID: !Ref BedrockModelId
+          BEDROCK_MAX_TOKENS: !Ref BedrockMaxTokens
+          BEDROCK_TEMPERATURE: !Ref BedrockTemperature
+          BEDROCK_TOP_K: !Ref BedrockTopK
+          BEDROCK_CONNECT_TIMEOUT: !Ref BedrockConnectTimeout
+          BEDROCK_REQUEST_TIMEOUT: !Ref BedrockRequestTimeout
+          BEDROCK_RETRIES: !Ref BedrockRetries
+          BEDROCK_MAX_EVENTS: !Ref BedrockMaxEvents
+          BEDROCK_MAX_PROMPT_CHARS: !Ref BedrockMaxPromptChars
+          BEDROCK_CHUNK_SIZE: !Ref BedrockChunkSize
+      Events:
+        ApiProxy:
+          Type: HttpApi
+          Properties:
+            Path: /api/{proxy+}
+            Method: ANY
+
+Outputs:
+  ApiBaseUrl:
+    Description: Base invoke URL for API Gateway
+    Value: !Sub 'https://${ServerlessHttpApi}.execute-api.${AWS::Region}.amazonaws.com'

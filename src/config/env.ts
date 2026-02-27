@@ -1,6 +1,6 @@
 export const ENV = {
   appName: import.meta.env.VITE_APP_NAME || 'Salesforce Vue',
-  apiBaseUrl: import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000/api',
+  apiBaseUrl: import.meta.env.VITE_API_BASE_URL || '',
   salesforce: {
     loginUrl: __SF_LOGIN_URL__.trim(),
     clientId: __SF_CLIENT_ID__.trim(),

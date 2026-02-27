@@ -1,6 +1,19 @@
 import { ENV } from '@/config/env'
 
 const normalizeBaseUrl = (url: string) => url.replace(/\/+$/, '')
+const isAbsoluteUrl = (value: string) => /^https?:\/\//i.test(value)
+const apiUrl = (path: string) => {
+  const configured = ENV.apiBaseUrl?.trim()
+  if (configured && isAbsoluteUrl(configured)) {
+    const base = normalizeBaseUrl(configured)
+    const normalizedPath = path.startsWith('/') ? path : `/${path}`
+    if (base.endsWith('/api') && normalizedPath.startsWith('/api/')) {
+      return `${base}${normalizedPath.slice(4)}`
+    }
+    return `${base}${normalizedPath}`
+  }
+  return path
+}
 const OAUTH_STATE_STORAGE_KEY = 'salesforce_oauth_state'
 const OAUTH_SESSION_STORAGE_KEY = 'salesforce_oauth_session'
 const AUTH_CHANGED_EVENT = 'salesforce-auth-changed'
@@ -107,18 +120,25 @@ export const buildSalesforceAuthorizeUrl = () => {
 
 export const redirectToSalesforceLogin = () => {
   const authorizeUrl = buildSalesforceAuthorizeUrl()
+  console.log('Authorize URL =', authorizeUrl)
   window.location.assign(authorizeUrl)
 }
 
 const fetchSalesforceToken = async (payload: Record<string, string>) => {
-  const response = await fetch('/api/auth/salesforce/token', {
+  const response = await fetch(apiUrl('/api/auth/salesforce/token'), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(payload),
   })
 
-  const data = (await response.json().catch(() => ({}))) as Record<string, unknown>
-
+  const rawText = await response.text()
+  let data: Record<string, unknown> = {}
+  try {
+    data = rawText ? (JSON.parse(rawText) as Record<string, unknown>) : {}
+  } catch {
+    data = {}
+  }
+  console.log('Fetch salesforce token is triggered and response is:', data)
   if (!response.ok) {
     const message =
       typeof data.error_description === 'string'
@@ -127,7 +147,14 @@ const fetchSalesforceToken = async (payload: Record<string, string>) => {
     throw new Error(message)
   }
 
-  return data as unknown as SalesforceTokenResponse
+  const token = data as unknown as SalesforceTokenResponse
+  if (!token.access_token || !token.instance_url || !token.token_type || !token.id) {
+    throw new Error(
+      'Invalid token response from /api/auth/salesforce/token. Check production /api routing and backend response.',
+    )
+  }
+
+  return token
 }
 
 const mapTokenToSession = (
@@ -151,8 +178,10 @@ const mapTokenToSession = (
 
 export const saveSalesforceSession = (session: SalesforceAuthSession) => {
   if (typeof window === 'undefined') return
-  window.localStorage.setItem(OAUTH_SESSION_STORAGE_KEY, JSON.stringify(session))
-  window.dispatchEvent(new CustomEvent(AUTH_CHANGED_EVENT))
+  localStorage.setItem(OAUTH_SESSION_STORAGE_KEY, JSON.stringify(session))
+  console.log('Data successfully saved in localstorage.')
+  // localStorage.setItem(OAUTH_SESSION_STORAGE_KEY, JSON.stringify(session))
+  dispatchEvent(new CustomEvent(AUTH_CHANGED_EVENT))
 }
 
 export const getSalesforceSession = (): SalesforceAuthSession | null => {
@@ -171,12 +200,13 @@ export const getSalesforceSession = (): SalesforceAuthSession | null => {
 
 export const clearSalesforceSession = () => {
   if (typeof window === 'undefined') return
-  window.localStorage.removeItem(OAUTH_SESSION_STORAGE_KEY)
-  window.sessionStorage.removeItem(OAUTH_STATE_STORAGE_KEY)
-  window.dispatchEvent(new CustomEvent(AUTH_CHANGED_EVENT))
+  localStorage.removeItem(OAUTH_SESSION_STORAGE_KEY)
+  sessionStorage.removeItem(OAUTH_STATE_STORAGE_KEY)
+  dispatchEvent(new CustomEvent(AUTH_CHANGED_EVENT))
 }
 
 export const handleSalesforceOAuthCallback = async (code: string, state: string) => {
+  console.log('Handle salesforce oauth callback is triggered....')
   if (typeof window === 'undefined') {
     throw new Error('OAuth callback requires a browser environment.')
   }
@@ -187,8 +217,9 @@ export const handleSalesforceOAuthCallback = async (code: string, state: string)
   }
 
   const token = await fetchSalesforceToken({ code })
+  console.log('Got token value is:', token)
   const session = mapTokenToSession(token, state)
-
+  console.log('Session value is:', session)
   saveSalesforceSession(session)
   window.sessionStorage.removeItem(OAUTH_STATE_STORAGE_KEY)
 
@@ -201,7 +232,7 @@ export const refreshSalesforceAccessToken = async () => {
     throw new Error('No Salesforce refresh token is available.')
   }
 
-  const response = await fetch('/api/auth/salesforce/refresh', {
+  const response = await fetch(apiUrl('/api/auth/salesforce/refresh'), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ refreshToken: currentSession.refreshToken }),
@@ -231,7 +262,7 @@ const performSalesforceRequest = async (
   headers.set('Authorization', `${session.tokenType} ${session.accessToken}`)
   headers.set('Accept', 'application/json')
 
-  const response = await fetch('/api/salesforce/request', {
+  const response = await fetch(apiUrl('/api/salesforce/request'), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
@@ -289,16 +320,12 @@ export const fetchMitocoEventsByUserAndDateRange = async (
   const conditions = [`OwnerId='${safeUserId}'`]
 
   if (startDate) {
-    const startDateTime = new Date(`${startDate}T00:00:00.000Z`)
-      .toISOString()
-      .replace('.000', '')
+    const startDateTime = new Date(`${startDate}T00:00:00.000Z`).toISOString().replace('.000', '')
     conditions.push(`StartDateTime >= ${startDateTime}`)
   }
 
   if (endDate) {
-    const endDateTime = new Date(`${endDate}T23:59:59.999Z`)
-      .toISOString()
-      .replace('.999', '')
+    const endDateTime = new Date(`${endDate}T23:59:59.999Z`).toISOString().replace('.999', '')
     conditions.push(`EndDateTime <= ${endDateTime}`)
   }
 
@@ -337,7 +364,7 @@ export const fetchEventSummary = async (
   options?: { startDate?: string; endDate?: string },
 ) => {
   const session = getSalesforceSession()
-  const response = await fetch('/api/bedrock/events-summary', {
+  const response = await fetch(apiUrl('/api/bedrock/events-summary'), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
@@ -353,7 +380,8 @@ export const fetchEventSummary = async (
 
   const payload = (await response.json().catch(() => ({}))) as Record<string, unknown>
   if (!response.ok) {
-    const message = typeof payload.error === 'string' ? payload.error : 'Failed to summarize events.'
+    const message =
+      typeof payload.error === 'string' ? payload.error : 'Failed to summarize events.'
     throw new Error(message)
   }
 

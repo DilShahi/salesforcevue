@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { RouterLink } from 'vue-router'
+import { RouterLink, useRouter } from 'vue-router'
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import IconNotification from '@/components/icons/IconNotification.vue'
 import { ENV } from '@/config/env'
@@ -17,6 +17,7 @@ const isMobileServicesOpen = ref(false)
 const isProfileMenuOpen = ref(false)
 const notificationCount = 5
 const session = ref(getSalesforceSession())
+const router = useRouter()
 
 const isAuthenticated = computed(() => Boolean(session.value?.accessToken))
 const profileName = computed(() => session.value?.state.split(':')[0] || 'Profile')
@@ -53,6 +54,7 @@ const handleSignOut = () => {
   clearSalesforceSession()
   refreshSession()
   closeMenus()
+  router.push({ name: 'home' })
 }
 
 onMounted(() => {
