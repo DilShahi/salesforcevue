@@ -141,7 +141,7 @@ const fetchSalesforceToken = async (payload: Record<string, string>) => {
   } catch {
     data = {}
   }
-  console.log('Fetch salesforce token is triggered and response is:', data)
+
   if (!response.ok) {
     const message =
       typeof data.error_description === 'string'
@@ -220,7 +220,6 @@ export const handleSalesforceOAuthCallback = async (code: string, state: string)
   }
 
   const token = await fetchSalesforceToken({ code })
-  console.log('Got token value is:', token)
   const session = mapTokenToSession(token, state)
   console.log('Session value is:', session)
   saveSalesforceSession(session)
