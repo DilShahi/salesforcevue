@@ -6,7 +6,8 @@ Since salesforce only allow HTTPS and AWS static web hosting doesn't allow HTTPS
 
 1. Zip the project with the following command:
    ```
-   npm install --omit=dev zip -r function.zip src package.json node_modules
+   npm install --omit=dev
+   zip -r function.zip src package.json node_modules
    ```
 2. First we will create lambda function with following configuration:
    - Set function name
