@@ -1,18 +1,21 @@
 import { ENV } from '@/config/env'
 
 const normalizeBaseUrl = (url: string) => url.replace(/\/+$/, '')
-const isAbsoluteUrl = (value: string) => /^https?:\/\//i.test(value)
 const apiUrl = (path: string) => {
   const configured = ENV.apiBaseUrl?.trim()
-  if (configured && isAbsoluteUrl(configured)) {
-    const base = normalizeBaseUrl(configured)
-    const normalizedPath = path.startsWith('/') ? path : `/${path}`
-    if (base.endsWith('/api') && normalizedPath.startsWith('/api/')) {
-      return `${base}${normalizedPath.slice(4)}`
-    }
-    return `${base}${normalizedPath}`
+  if (!configured) {
+    throw new Error(
+      'Missing VITE_API_BASE_URL. Configure it to your API Gateway base URL for both development and production.',
+    )
   }
-  return path
+
+  const base = normalizeBaseUrl(configured)
+  const normalizedPath = path.startsWith('/') ? path : `/${path}`
+  if (base.endsWith('/api') && normalizedPath.startsWith('/api/')) {
+    return `${base}${normalizedPath.slice(4)}`
+  }
+
+  return `${base}${normalizedPath}`
 }
 const OAUTH_STATE_STORAGE_KEY = 'salesforce_oauth_state'
 const OAUTH_SESSION_STORAGE_KEY = 'salesforce_oauth_session'
