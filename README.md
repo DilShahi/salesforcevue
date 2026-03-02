@@ -42,6 +42,31 @@ Since salesforce only allow HTTPS and AWS static web hosting doesn't allow HTTPS
      - SF_LOGIN_URL
      - SF_REDIRECT_URI
      - SF_SCOPES
+   - Select "Permission" option
+     - Select the execution role. Example: "okicom-test-salesforce-backend-role-thdk0tx1"
+     - In "Permission" tab
+       - Select "Add Permission" option
+       - Select "Create Inline Policy" dropdown menu.
+       - Select "JSON" tab
+       - Paste the following permission:
+         ```
+         {
+             "Version": "2012-10-17",
+             "Statement": [
+                 {
+                 "Sid": "AllowBedrockInvoke",
+                 "Effect": "Allow",
+                 "Action": [
+                     "bedrock:InvokeModel",
+                     "bedrock:InvokeModelWithResponseStream"
+                 ],
+                 "Resource": "*"
+                 }
+             ]
+         }
+         ```
+       - Set policy name as "BedrockInvokePolicy"
+       - Click "Create" button
 
 ## Gateway API Creation
 
