@@ -333,60 +333,6 @@ const summarizeEvents = async (events) => {
   }
 }
 
-const toSalesforceDateTimeRange = (startDate, endDate) => {
-  const conditions = []
-
-  if (startDate) {
-    const start = new Date(`${startDate}T00:00:00.000Z`).toISOString().replace('.000', '')
-    conditions.push(`StartDateTime >= ${start}`)
-  }
-
-  if (endDate) {
-    const end = new Date(`${endDate}T23:59:59.999Z`).toISOString().replace('.999', '')
-    conditions.push(`EndDateTime <= ${end}`)
-  }
-
-  return conditions
-}
-
-const fetchSalesforceEventsForSummary = async ({ userId, startDate, endDate, instanceUrl, accessToken, tokenType }) => {
-  const configuredMaxEvents = Math.max(envNumber(process.env.BEDROCK_MAX_EVENTS, 0), 0)
-  const effectiveMaxEvents = configuredMaxEvents > 0 ? configuredMaxEvents : 500
-
-  const safeUserId = userId.replace(/'/g, "\\'")
-  const conditions = [`OwnerId='${safeUserId}'`, ...toSalesforceDateTimeRange(startDate, endDate)]
-  const soql =
-    `SELECT Id, Subject, StartDateTime, EndDateTime ` +
-    `FROM Event ` +
-    `WHERE ${conditions.join(' AND ')} ` +
-    `ORDER BY StartDateTime DESC ` +
-    `LIMIT ${effectiveMaxEvents}`
-
-  const query = new URLSearchParams({ q: soql }).toString()
-  const salesforceUrl = `${normalizeBaseUrl(instanceUrl)}/services/data/v62.0/query?${query}`
-
-  const response = await fetch(salesforceUrl, {
-    method: 'GET',
-    headers: {
-      Authorization: `${tokenType || 'Bearer'} ${accessToken}`,
-      Accept: 'application/json',
-    },
-  })
-
-  const payload = await parseUpstreamResponse(response)
-  if (!response.ok) {
-    const message =
-      payload && typeof payload === 'object' && typeof payload.error === 'string'
-        ? payload.error
-        : 'Could not fetch events from Salesforce.'
-    const error = new Error(message)
-    error.statusCode = response.status
-    throw error
-  }
-
-  return Array.isArray(payload?.records) ? payload.records : []
-}
-
 const handleEventsSummary = async (body) => {
   const userId = typeof body.userId === 'string' ? body.userId : ''
   if (!/^[a-zA-Z0-9]{15,18}$/.test(userId)) {
@@ -403,32 +349,7 @@ const handleEventsSummary = async (body) => {
   }
 
   if (events.length === 0) {
-    const startDate = typeof body.startDate === 'string' ? body.startDate : ''
-    const endDate = typeof body.endDate === 'string' ? body.endDate : ''
-    const instanceUrl = typeof body.instanceUrl === 'string' ? body.instanceUrl.trim() : ''
-    const accessToken = typeof body.accessToken === 'string' ? body.accessToken.trim() : ''
-    const tokenType = typeof body.tokenType === 'string' ? body.tokenType.trim() : 'Bearer'
-
-    if (!instanceUrl || !accessToken || !startDate || !endDate) {
-      const error = new Error(
-        'No events provided. Missing date range or Salesforce session context to fetch events.',
-      )
-      error.statusCode = 422
-      throw error
-    }
-
-    events = await fetchSalesforceEventsForSummary({
-      userId,
-      startDate,
-      endDate,
-      instanceUrl,
-      accessToken,
-      tokenType,
-    })
-  }
-
-  if (events.length === 0) {
-    const error = new Error('No events found for the selected range.')
+    const error = new Error('No events provided for summary.')
     error.statusCode = 422
     throw error
   }

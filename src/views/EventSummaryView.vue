@@ -130,7 +130,7 @@ const loadSummary = async () => {
   try {
     const response = await fetchEventSummary(
       userId,
-      [],
+      events,
       {
         startDate: startDate.value,
         endDate: endDate.value,

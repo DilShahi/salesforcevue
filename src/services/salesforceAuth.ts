@@ -91,6 +91,26 @@ export type EventSummaryResponse = {
   categoryDetails: EventSummaryCategoryDetail[]
 }
 
+const SUMMARY_CHUNK_SIZE = 20
+const SUMMARY_MAX_CONCURRENCY = 3
+const SUMMARY_MAX_RETRIES = 2
+
+const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
+
+const isTransientSummaryError = (message: string) => {
+  const normalized = message.toLowerCase()
+  return (
+    normalized.includes('429') ||
+    normalized.includes('500') ||
+    normalized.includes('502') ||
+    normalized.includes('503') ||
+    normalized.includes('504') ||
+    normalized.includes('throttl') ||
+    normalized.includes('timeout') ||
+    normalized.includes('service unavailable')
+  )
+}
+
 const buildOAuthState = () => {
   const alias = ENV.salesforce.aliasName || 'salesforce'
   const state = `${alias}:${Date.now()}`
@@ -365,27 +385,102 @@ export const fetchEventSummary = async (
   events: SummaryEventPayload[],
   options?: { startDate?: string; endDate?: string },
 ) => {
-  const session = getSalesforceSession()
-  const response = await fetch(apiUrl('/api/bedrock/events-summary'), {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      userId,
-      events,
-      startDate: options?.startDate,
-      endDate: options?.endDate,
-      instanceUrl: session?.instanceUrl,
-      accessToken: session?.accessToken,
-      tokenType: session?.tokenType,
-    }),
-  })
-
-  const payload = (await response.json().catch(() => ({}))) as Record<string, unknown>
-  if (!response.ok) {
-    const message =
-      typeof payload.error === 'string' ? payload.error : 'Failed to summarize events.'
-    throw new Error(message)
+  if (!Array.isArray(events) || events.length === 0) {
+    throw new Error('No events provided for summary.')
   }
 
-  return payload as unknown as EventSummaryResponse
+  const chunks: SummaryEventPayload[][] = []
+  for (let index = 0; index < events.length; index += SUMMARY_CHUNK_SIZE) {
+    chunks.push(events.slice(index, index + SUMMARY_CHUNK_SIZE))
+  }
+
+  const processChunk = async (chunk: SummaryEventPayload[], chunkIndex: number) => {
+    let attempt = 0
+    while (attempt <= SUMMARY_MAX_RETRIES) {
+      const response = await fetch(apiUrl('/api/bedrock/events-summary'), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userId,
+          events: chunk,
+          startDate: options?.startDate,
+          endDate: options?.endDate,
+        }),
+      })
+
+      const payload = (await response.json().catch(() => ({}))) as Record<string, unknown>
+      if (response.ok) {
+        return payload as unknown as EventSummaryResponse
+      }
+
+      const message =
+        typeof payload.error === 'string' ? payload.error : 'Failed to summarize events.'
+      const scopedMessage = `Chunk ${chunkIndex + 1}/${chunks.length}: ${message}`
+
+      if (attempt >= SUMMARY_MAX_RETRIES || !isTransientSummaryError(scopedMessage)) {
+        throw new Error(scopedMessage)
+      }
+
+      // Backoff to reduce throttling and transient Bedrock/API errors.
+      await wait(600 * (attempt + 1))
+      attempt += 1
+    }
+
+    throw new Error(`Chunk ${chunkIndex + 1}/${chunks.length}: Failed to summarize events.`)
+  }
+
+  const chunkSummaries: EventSummaryResponse[] = []
+  for (let index = 0; index < chunks.length; index += SUMMARY_MAX_CONCURRENCY) {
+    const batch = chunks.slice(index, index + SUMMARY_MAX_CONCURRENCY)
+    const batchResults = await Promise.all(
+      batch.map((chunk, offset) => processChunk(chunk, index + offset)),
+    )
+    chunkSummaries.push(...batchResults)
+  }
+  const categoryMap = new Map<string, Map<string, EventSummaryCategoryEvent>>()
+
+  chunkSummaries.forEach((summary) => {
+    summary.categoryDetails.forEach((category) => {
+      if (!categoryMap.has(category.name)) {
+        categoryMap.set(category.name, new Map<string, EventSummaryCategoryEvent>())
+      }
+
+      const eventMap = categoryMap.get(category.name)!
+      category.events.forEach((event) => {
+        const key = `${event.subject}|${event.startDateTime}|${event.endDateTime}`
+        eventMap.set(key, event)
+      })
+    })
+  })
+
+  const categoryDetails: EventSummaryCategoryDetail[] = Array.from(categoryMap.entries())
+    .map(([name, eventsMap]) => {
+      const mergedEvents = Array.from(eventsMap.values())
+      return {
+        name,
+        count: mergedEvents.length,
+        events: mergedEvents,
+      }
+    })
+    .sort((left, right) => right.count - left.count)
+
+  const chartLabels = categoryDetails.map((category) => category.name)
+  const chartCounts = categoryDetails.map((category) => category.count)
+  const overview = `Total ${events.length} events grouped into ${categoryDetails.length} categories.`
+  const summaryTextLines = [overview, ...categoryDetails.map((item) => `${item.name}: ${item.count}`)]
+
+  return {
+    summary: JSON.stringify(
+      {
+        overview,
+        categories: categoryDetails,
+      },
+      null,
+      2,
+    ),
+    summaryText: summaryTextLines.join('\n'),
+    chartLabels,
+    chartCounts,
+    categoryDetails,
+  }
 }
