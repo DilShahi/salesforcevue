@@ -1,4 +1,5 @@
 import { ENV } from '@/config/env'
+import { processDatasetInChunks } from '@dshahi468/nd-dataset-split'
 
 const normalizeBaseUrl = (url: string) => url.replace(/\/+$/, '')
 const apiUrl = (path: string) => {
@@ -94,8 +95,6 @@ export type EventSummaryResponse = {
 const SUMMARY_CHUNK_SIZE = 20
 const SUMMARY_MAX_CONCURRENCY = 3
 const SUMMARY_MAX_RETRIES = 2
-
-const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
 
 const isTransientSummaryError = (message: string) => {
   const normalized = message.toLowerCase()
@@ -384,103 +383,96 @@ export const fetchEventSummary = async (
   userId: string,
   events: SummaryEventPayload[],
   options?: { startDate?: string; endDate?: string },
-) => {
+): Promise<EventSummaryResponse> => {
   if (!Array.isArray(events) || events.length === 0) {
     throw new Error('No events provided for summary.')
   }
 
-  const chunks: SummaryEventPayload[][] = []
-  for (let index = 0; index < events.length; index += SUMMARY_CHUNK_SIZE) {
-    chunks.push(events.slice(index, index + SUMMARY_CHUNK_SIZE))
-  }
-
-  const processChunk = async (chunk: SummaryEventPayload[], chunkIndex: number) => {
-    let attempt = 0
-    while (attempt <= SUMMARY_MAX_RETRIES) {
+  const mergedSummary = (await processDatasetInChunks(
+    events,
+    async (chunkArray, chunkIndex, totalChunks): Promise<EventSummaryResponse> => {
       const response = await fetch(apiUrl('/api/bedrock/events-summary'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           userId,
-          events: chunk,
+          events: chunkArray,
           startDate: options?.startDate,
           endDate: options?.endDate,
         }),
       })
 
       const payload = (await response.json().catch(() => ({}))) as Record<string, unknown>
-      if (response.ok) {
-        return payload as unknown as EventSummaryResponse
+      if (!response.ok) {
+        throw new Error(
+          `Chunk ${chunkIndex + 1}/${totalChunks}: ${
+            typeof payload.error === 'string' ? payload.error : 'Failed to summarize events.'
+          }`,
+        )
       }
 
-      const message =
-        typeof payload.error === 'string' ? payload.error : 'Failed to summarize events.'
-      const scopedMessage = `Chunk ${chunkIndex + 1}/${chunks.length}: ${message}`
+      return payload as EventSummaryResponse
+    },
+    {
+      chunkSize: SUMMARY_CHUNK_SIZE,
+      maxConcurrency: SUMMARY_MAX_CONCURRENCY,
+      retries: SUMMARY_MAX_RETRIES,
+      retryDelayMs: 600,
+      backoffMultiplier: 1.5,
+      shouldRetry: (error) => isTransientSummaryError(String((error as Error).message)),
+      mergeResults: (results): EventSummaryResponse => {
+        const categoryMap = new Map<string, Map<string, EventSummaryCategoryEvent>>()
 
-      if (attempt >= SUMMARY_MAX_RETRIES || !isTransientSummaryError(scopedMessage)) {
-        throw new Error(scopedMessage)
-      }
+        results.forEach((summary) => {
+          summary.categoryDetails.forEach((category) => {
+            if (!categoryMap.has(category.name)) {
+              categoryMap.set(category.name, new Map<string, EventSummaryCategoryEvent>())
+            }
 
-      // Backoff to reduce throttling and transient Bedrock/API errors.
-      await wait(600 * (attempt + 1))
-      attempt += 1
-    }
+            const eventMap = categoryMap.get(category.name)!
+            category.events.forEach((event) => {
+              const key = `${event.subject}|${event.startDateTime}|${event.endDateTime}`
+              eventMap.set(key, event)
+            })
+          })
+        })
 
-    throw new Error(`Chunk ${chunkIndex + 1}/${chunks.length}: Failed to summarize events.`)
-  }
+        const categoryDetails: EventSummaryCategoryDetail[] = Array.from(categoryMap.entries())
+          .map(([name, eventsMap]) => {
+            const mergedEvents = Array.from(eventsMap.values())
+            return {
+              name,
+              count: mergedEvents.length,
+              events: mergedEvents,
+            }
+          })
+          .sort((left, right) => right.count - left.count)
 
-  const chunkSummaries: EventSummaryResponse[] = []
-  for (let index = 0; index < chunks.length; index += SUMMARY_MAX_CONCURRENCY) {
-    const batch = chunks.slice(index, index + SUMMARY_MAX_CONCURRENCY)
-    const batchResults = await Promise.all(
-      batch.map((chunk, offset) => processChunk(chunk, index + offset)),
-    )
-    chunkSummaries.push(...batchResults)
-  }
-  const categoryMap = new Map<string, Map<string, EventSummaryCategoryEvent>>()
+        const chartLabels = categoryDetails.map((category) => category.name)
+        const chartCounts = categoryDetails.map((category) => category.count)
+        const overview = `Total ${events.length} events grouped into ${categoryDetails.length} categories.`
+        const summaryTextLines = [
+          overview,
+          ...categoryDetails.map((item) => `${item.name}: ${item.count}`),
+        ]
 
-  chunkSummaries.forEach((summary) => {
-    summary.categoryDetails.forEach((category) => {
-      if (!categoryMap.has(category.name)) {
-        categoryMap.set(category.name, new Map<string, EventSummaryCategoryEvent>())
-      }
-
-      const eventMap = categoryMap.get(category.name)!
-      category.events.forEach((event) => {
-        const key = `${event.subject}|${event.startDateTime}|${event.endDateTime}`
-        eventMap.set(key, event)
-      })
-    })
-  })
-
-  const categoryDetails: EventSummaryCategoryDetail[] = Array.from(categoryMap.entries())
-    .map(([name, eventsMap]) => {
-      const mergedEvents = Array.from(eventsMap.values())
-      return {
-        name,
-        count: mergedEvents.length,
-        events: mergedEvents,
-      }
-    })
-    .sort((left, right) => right.count - left.count)
-
-  const chartLabels = categoryDetails.map((category) => category.name)
-  const chartCounts = categoryDetails.map((category) => category.count)
-  const overview = `Total ${events.length} events grouped into ${categoryDetails.length} categories.`
-  const summaryTextLines = [overview, ...categoryDetails.map((item) => `${item.name}: ${item.count}`)]
-
-  return {
-    summary: JSON.stringify(
-      {
-        overview,
-        categories: categoryDetails,
+        return {
+          summary: JSON.stringify(
+            {
+              overview,
+              categories: categoryDetails,
+            },
+            null,
+            2,
+          ),
+          summaryText: summaryTextLines.join('\n'),
+          chartLabels,
+          chartCounts,
+          categoryDetails,
+        }
       },
-      null,
-      2,
-    ),
-    summaryText: summaryTextLines.join('\n'),
-    chartLabels,
-    chartCounts,
-    categoryDetails,
-  }
+    },
+  )) as EventSummaryResponse
+
+  return mergedSummary
 }
