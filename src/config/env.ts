@@ -8,4 +8,11 @@ export const ENV = {
     scopes: __SF_SCOPES__.trim(),
     aliasName: __SF_ALIAS_NAME__.trim(),
   },
+  direct: {
+    clientId: __DIRECT_CLIENT_ID__.trim(),
+    clientSecret: __DIRECT_CLIENT_SECRET__.trim(),
+    redirectUrl: __DIRECT_REDIRECT_URL__.trim(),
+    restApi: __DIRECT_REST_API__.trim(),
+    scopes: __DIRECT_SCOPES__.trim(),
+  },
 }

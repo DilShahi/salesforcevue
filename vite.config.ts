@@ -18,6 +18,11 @@ export default defineConfig(({ mode }) => {
       __SF_REDIRECT_URI__: JSON.stringify(env.SF_REDIRECT_URI ?? ''),
       __SF_SCOPES__: JSON.stringify(env.SF_SCOPES ?? ''),
       __SF_ALIAS_NAME__: JSON.stringify(env.SF_ALIAS_NAME ?? ''),
+      __DIRECT_CLIENT_ID__: JSON.stringify(env.DIRECT_CLIENT_ID ?? ''),
+      __DIRECT_CLIENT_SECRET__: JSON.stringify(env.DIRECT_CLIENT_SECRET ?? ''),
+      __DIRECT_REDIRECT_URL__: JSON.stringify(env.DIRECT_REDIRECT_URL ?? ''),
+      __DIRECT_REST_API__: JSON.stringify(env.DIRECT_REST_API ?? ''),
+      __DIRECT_SCOPES__: JSON.stringify(env.DIRECT_SCOPES ?? 'openid offline_access profile email'),
     },
     resolve: {
       alias: {

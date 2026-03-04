@@ -1,4 +1,4 @@
-# Okicom Salesforce Project
+## Okicom Salesforce Project
 
 Since salesforce only allow HTTPS and AWS static web hosting doesn't allow HTTPS redirection. So, we need to deploy lambda function and create API Gateway and redirect HTTP to HTTPS.
 
@@ -96,3 +96,21 @@ Since salesforce only allow HTTPS and AWS static web hosting doesn't allow HTTPS
      - Set "Access-Control-Allow-Headers" as "content-type" and "authorization"
      - Set "Access-Control-Allow-Methods" as "GET", "POST" and "OPTIONS"
      - Click "Save" button
+
+## Integrating "Direct" Application
+
+In order to integrate "Direct" OAuth in our application, we need to register our application in "Direct". So, we will register our application in the following link:
+
+```
+https://direct4b.com/settings/home#/applications
+```
+
+Then generate client_id and client_secret and store in your environment variable as below:
+
+```
+DIRECT_CLIENT_ID="direct_client_id"
+DIRECT_CLIENT_SECRET="direct_client_secret"
+DIRECT_REDIRECT_URL="your_callback_route"
+```
+
+https://directdev.feel-on.com/ja/api/id_guide.html#linkage

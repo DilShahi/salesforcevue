@@ -6,6 +6,9 @@ import OAuthCallbackView from '@/views/OAuthCallbackView.vue'
 import UserListView from '@/views/UserListView.vue'
 import EventListView from '@/views/EventListView.vue'
 import EventSummaryView from '@/views/EventSummaryView.vue'
+import DirectLayout from '@/layout/DirectLayout.vue'
+import DirectTalkRoomView from '@/views/DirectTalkRoomView.vue'
+import DirectOAuthCallbackView from '@/views/direct/OAuthCallbackView.vue'
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -26,6 +29,24 @@ const router = createRouter({
       component: OAuthCallbackView,
     },
     {
+      path: '/direct',
+      name: 'directLayout',
+      component: DirectLayout,
+      redirect: { name: 'directTalkRoom' },
+      children: [
+        {
+          path: 'oauth/callback',
+          name: 'directOAuthCallback',
+          component: DirectOAuthCallbackView,
+        },
+        {
+          path: 'talkroom',
+          name: 'directTalkRoom',
+          component: DirectTalkRoomView,
+        },
+      ],
+    },
+    {
       path: '/users',
       name: 'users',
       component: UserListView,
@@ -43,33 +64,33 @@ const router = createRouter({
   ],
 })
 
-router.beforeEach(async (to) => {
-  const code = Array.isArray(to.query.code) ? to.query.code[0] : to.query.code
-  const state = Array.isArray(to.query.state) ? to.query.state[0] : to.query.state
+// router.beforeEach(async (to) => {
+//   const code = Array.isArray(to.query.code) ? to.query.code[0] : to.query.code
+//   const state = Array.isArray(to.query.state) ? to.query.state[0] : to.query.state
 
-  if (typeof code !== 'string' || typeof state !== 'string') {
-    if (to.path === '/oauth/callback') {
-      return { name: 'home', replace: true }
-    }
-    return true
-  }
+//   if (typeof code !== 'string' || typeof state !== 'string') {
+//     if (to.path === '/oauth/callback') {
+//       return { name: 'home', replace: true }
+//     }
+//     return true
+//   }
 
-  try {
-    await handleSalesforceOAuthCallback(code, state)
-  } catch (error) {
-    console.error('Salesforce OAuth callback processing failed:', error)
-  }
+//   try {
+//     await handleSalesforceOAuthCallback(code, state)
+//   } catch (error) {
+//     console.error('Salesforce OAuth callback processing failed:', error)
+//   }
 
-  const cleanedQuery = { ...to.query }
-  delete cleanedQuery.code
-  delete cleanedQuery.state
+//   const cleanedQuery = { ...to.query }
+//   delete cleanedQuery.code
+//   delete cleanedQuery.state
 
-  return {
-    path: to.path,
-    query: cleanedQuery,
-    hash: to.hash,
-    replace: true,
-  }
-})
+//   return {
+//     path: to.path,
+//     query: cleanedQuery,
+//     hash: to.hash,
+//     replace: true,
+//   }
+// })
 
 export default router

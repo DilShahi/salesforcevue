@@ -82,11 +82,14 @@ onBeforeUnmount(() => {
           <RouterLink to="/" class="text-sm font-medium text-slate-700 hover:text-slate-900">
             Home
           </RouterLink>
-          <RouterLink to="/about" class="text-sm font-medium text-slate-700 hover:text-slate-900">
-            About
+          <RouterLink
+            :to="{ name: 'directTalkRoom' }"
+            class="text-sm font-medium text-slate-700 hover:text-slate-900"
+          >
+            Direct
           </RouterLink>
           <RouterLink to="/users" class="text-sm font-medium text-slate-700 hover:text-slate-900">
-            User List
+            Salesforce
           </RouterLink>
 
           <div class="relative">
@@ -185,18 +188,18 @@ onBeforeUnmount(() => {
           Home
         </RouterLink>
         <RouterLink
-          to="/about"
+          :to="{ name: 'directTalkRoom' }"
           class="block rounded-md px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-100"
           @click="closeMenus"
         >
-          About
+          Direct
         </RouterLink>
         <RouterLink
           to="/users"
           class="block rounded-md px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-100"
           @click="closeMenus"
         >
-          User List
+          Salesforce
         </RouterLink>
         <div>
           <button

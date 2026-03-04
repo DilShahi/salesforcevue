@@ -60,7 +60,9 @@ const getPath = (event) => event?.rawPath || event?.path || event?.requestContex
 const parseBody = (event) => {
   if (!event?.body) return {}
   try {
-    const raw = event.isBase64Encoded ? Buffer.from(event.body, 'base64').toString('utf-8') : event.body
+    const raw = event.isBase64Encoded
+      ? Buffer.from(event.body, 'base64').toString('utf-8')
+      : event.body
     return raw ? JSON.parse(raw) : {}
   } catch {
     return null
@@ -74,6 +76,30 @@ const parseUpstreamResponse = async (response) => {
   } catch {
     return text
   }
+}
+
+const directforceTokenRequest = async (params) => {
+  const tokenUrl =
+    trimEnv(process.env.DIRECT_TOKEN_URL) || 'https://directdev.feel-on.com/oauth2/token'
+  console.log('Token url is:', tokenUrl)
+  const response = await fetch(tokenUrl, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams(params).toString(),
+  })
+  console.log('Response value is:', response)
+  const payload = await parseUpstreamResponse(response)
+  console.log('Payload value is:', payload)
+  if (!response.ok) {
+    const message =
+      payload && typeof payload === 'object' && typeof payload.error_description === 'string'
+        ? payload.error_description
+        : 'Direct token request failed.'
+    const error = new Error(message)
+    error.statusCode = response.status
+    throw error
+  }
+  return payload
 }
 
 const salesforceTokenRequest = async (params) => {
@@ -372,6 +398,21 @@ export const handler = async (event) => {
   }
 
   try {
+    if (method === 'POST' && path === '/api/auth/direct/token') {
+      const code = typeof body.code === 'string' ? body.code : ''
+      if (!code) {
+        return jsonResponse(400, { error: 'Missing authorization code.' }, requestOrigin)
+      }
+      const payload = await directforceTokenRequest({
+        grant_type: 'authorization_code',
+        code,
+        client_id: trimEnv(process.env.DIRECT_CLIENT_ID),
+        client_secret: trimEnv(process.env.DIRECT_CLIENT_SECRET),
+        redirect_uri: trimEnv(process.env.DIRECT_REDIRECT_URI),
+      })
+      return jsonResponse(200, payload, requestOrigin)
+    }
+
     if (method === 'POST' && path === '/api/auth/salesforce/token') {
       const code = typeof body.code === 'string' ? body.code : ''
       if (!code) {
