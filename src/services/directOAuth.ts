@@ -4,7 +4,8 @@ const normalizeBaseUrl = (url: string) => url.replace(/\/+$/, '')
 
 const OAUTH_STATE_STORAGE_KEY = 'direct_oauth_state'
 const OAUTH_SESSION_STORAGE_KEY = 'direct_oauth_session'
-const AUTH_CHANGED_EVENT = 'direct-auth-changed'
+const OAUTH_SESSION_INFO = 'direct_user_info'
+export const DIRECT_AUTH_CHANGED_EVENT = 'direct-auth-changed'
 
 type DirectTokenResponse = {
   access_token: string
@@ -22,6 +23,12 @@ type DirectAuthSession = {
   state: string
   scope?: string
   savedAt: string
+}
+
+type LoggedInUserInfo = {
+  email: string
+  name: string
+  sub: string
 }
 
 const DIRECT = {
@@ -74,6 +81,7 @@ export const buildDirectAuthorizeUrl = () => {
       'Missing direct OAuth env values. Required: DIRECT_CLIENT_ID, DIRECT_CLIENT_SECRET and DIRECT_REDIRECT_URL',
     )
   }
+  console.log('Scopes is:', scopes)
   const url = new URL(`${normalizeBaseUrl(restApi)}/oauth2/authorize`)
   url.searchParams.set('response_type', 'code')
   url.searchParams.set('client_id', clientId)
@@ -89,15 +97,35 @@ export const redirectToDirectLogin = () => {
   window.location.assign(authorizeUrl)
 }
 
+const directLogout = async (session: DirectAuthSession | null) => {
+  if (!session?.accessToken) return
+
+  const response = await fetch(apiUrl('/api/auth/direct/logout'), {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `${session.tokenType || 'Bearer'} ${session.accessToken}`,
+    },
+    body: JSON.stringify({
+      token: session.accessToken,
+    }),
+  })
+
+  const payload = (await response.json().catch(() => ({}))) as Record<string, unknown>
+  if (!response.ok) {
+    const message =
+      typeof payload.error === 'string' ? payload.error : 'Failed to logout from Direct.'
+    throw new Error(message)
+  }
+}
+
 const fetchDirectForceToken = async (payload: Record<string, string>) => {
   const response = await fetch(apiUrl('/api/auth/direct/token'), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(payload),
   })
-  console.log('Response value is:', response)
   const rawText = await response.text()
-  console.log('Raw text value is:', rawText)
   let data: Record<string, unknown> = {}
   try {
     data = rawText ? (JSON.parse(rawText) as Record<string, unknown>) : {}
@@ -135,11 +163,77 @@ const mapTokenToSession = (
   }
 }
 
+const mapIdToken = (info: any): LoggedInUserInfo => {
+  return {
+    email: info.email,
+    name: info.name,
+    sub: info.sub,
+  }
+}
+
 const saveDirectSession = (session: DirectAuthSession) => {
   if (typeof window === 'undefined') return
   localStorage.setItem(OAUTH_SESSION_STORAGE_KEY, JSON.stringify(session))
   console.log('Data successfully saved in localstorage')
-  dispatchEvent(new CustomEvent(AUTH_CHANGED_EVENT))
+  dispatchEvent(new CustomEvent(DIRECT_AUTH_CHANGED_EVENT))
+}
+
+const saveUserInfo = (info: LoggedInUserInfo) => {
+  if (typeof window === 'undefined') return
+  localStorage.setItem(OAUTH_SESSION_INFO, JSON.stringify(info))
+}
+
+export const getDirectSession = (): DirectAuthSession | null => {
+  if (typeof window === 'undefined') return null
+
+  const raw = window.localStorage.getItem(OAUTH_SESSION_STORAGE_KEY)
+  if (!raw) return null
+
+  try {
+    return JSON.parse(raw) as DirectAuthSession
+  } catch {
+    window.localStorage.removeItem(OAUTH_SESSION_STORAGE_KEY)
+    return null
+  }
+}
+
+export const clearDirectSession = async () => {
+  if (typeof window === 'undefined') return
+  const session = getDirectSession()
+  try {
+    await directLogout(session)
+  } catch (error) {
+    console.error('Direct logout request failed:', error)
+  }
+  window.localStorage.removeItem(OAUTH_SESSION_STORAGE_KEY)
+  window.localStorage.removeItem(OAUTH_SESSION_INFO)
+  window.sessionStorage.removeItem(OAUTH_STATE_STORAGE_KEY)
+  dispatchEvent(new CustomEvent(DIRECT_AUTH_CHANGED_EVENT))
+}
+
+const getLoggedInUserInfo = async (accessToken: string) => {
+  const response = await fetch(apiUrl('/api/auth/direct/userinfo'), {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${accessToken}`,
+    },
+  })
+  const rawText = await response.text()
+  let data: Record<string, unknown> = {}
+  try {
+    data = rawText ? (JSON.parse(rawText) as Record<string, unknown>) : {}
+  } catch {
+    data = {}
+  }
+  if (!response.ok) {
+    const message =
+      typeof data.error_description === 'string'
+        ? data.error_description
+        : 'Failed to get logged in user info.'
+    throw new Error(message)
+  }
+  return data as LoggedInUserInfo
 }
 
 export const handleDirectForceOAuthCallback = async (code: string, state: string) => {
@@ -153,9 +247,11 @@ export const handleDirectForceOAuthCallback = async (code: string, state: string
   }
   const token = await fetchDirectForceToken({ code })
   const session = mapTokenToSession(token, state)
-  console.log('Token value is:', token)
   console.log('Session value is:', session)
   saveDirectSession(session)
+  const response = await getLoggedInUserInfo(token.access_token ?? '')
+  const info = mapIdToken(response)
+  saveUserInfo(info)
   window.sessionStorage.removeItem(OAUTH_STATE_STORAGE_KEY)
   return token
 }

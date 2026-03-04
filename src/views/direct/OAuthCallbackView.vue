@@ -19,7 +19,7 @@ onMounted(async () => {
     await handleDirectForceOAuthCallback(code, state)
     router.push({ name: 'directTalkRoom' })
   } catch (error) {
-    console.error('Salesforce OAuth callback processing failed:', error)
+    console.error('Direct OAuth callback processing failed:', error)
   }
 })
 </script>

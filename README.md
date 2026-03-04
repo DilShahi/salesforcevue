@@ -111,6 +111,17 @@ Then generate client_id and client_secret and store in your environment variable
 DIRECT_CLIENT_ID="direct_client_id"
 DIRECT_CLIENT_SECRET="direct_client_secret"
 DIRECT_REDIRECT_URL="your_callback_route"
+DIRECT_TOKEN_URL="direct_token_url"
+DIRECT_LOGOUT_URL="direct_token_revoke"
 ```
 
+For more guide you can study the following link:
+
+```
 https://directdev.feel-on.com/ja/api/id_guide.html#linkage
+```
+
+curl -v \
+ -H "Authorization: Bearer 18f68f2cabc00000_4c221b9e68d110692b43ba98402111422eaefa5c" \
+ -H "Accept: application/json" \
+ "https://restapi-directdev.feel-on.com/albero-app-server/users/me/openIdConnect"

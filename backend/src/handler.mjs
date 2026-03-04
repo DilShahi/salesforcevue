@@ -102,6 +102,69 @@ const directforceTokenRequest = async (params) => {
   return payload
 }
 
+const directUserInfo = async (params) => {
+  const url =
+    trimEnv(process.env.DIRECT_USERINFO_ENDPOINT) ||
+    'https://restapi.direct4b.com/albero-app-server/users/me/openIdConnect'
+  const token = typeof params.token === 'string' ? params.token : ''
+  if (!token) {
+    const error = new Error('Missing access token')
+    error.statusCode = 400
+    throw error
+  }
+  const response = await fetch(url, {
+    method: 'GET',
+    headers: {
+      'Content-Type': 'application/x-www-form-urlencoded',
+      Authorization: `Bearer ${token}`,
+    },
+  })
+  console.log('Response from the server is:', response)
+  const payload = await parseUpstreamResponse(response)
+  console.log('Payload value is:', payload)
+  if (!response.ok) {
+    const message =
+      payload && typeof payload === 'object' && typeof payload.error_description === 'string'
+        ? payload.error_description
+        : 'User info request failed.'
+    const error = new Error(message)
+    error.statusCode = response.status
+    throw error
+  }
+  return payload
+}
+
+const directForceLogout = async (params) => {
+  const url =
+    trimEnv(process.env.DIRECT_LOGOUT_URL) ||
+    `${normalizeBaseUrl(trimEnv(process.env.DIRECT_REST_API, 'https://directdev.feel-on.com'))}/oauth2/revoke`
+  const token = typeof params.token === 'string' ? params.token : ''
+  if (!token) {
+    const error = new Error('Missing access token')
+    error.statusCode = 400
+    throw error
+  }
+  const body = new URLSearchParams({
+    token,
+    client_id: trimEnv(process.env.DIRECT_CLIENT_ID),
+    client_secret: trimEnv(process.env.DIRECT_CLIENT_SECRET),
+  }).toString()
+  const resp = await fetch(url, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/x-www-form-urlencoded',
+    },
+    body,
+  })
+  const payload = await parseUpstreamResponse(resp)
+  if (!resp.ok) {
+    const error = new Error(`revoke failed: ${resp.status}`)
+    error.statusCode = resp.status
+    throw error
+  }
+  return payload && typeof payload === 'object' ? payload : { success: true }
+}
+
 const salesforceTokenRequest = async (params) => {
   const loginUrl = trimEnv(process.env.SF_LOGIN_URL)
   if (!loginUrl) {
@@ -409,6 +472,40 @@ export const handler = async (event) => {
         client_id: trimEnv(process.env.DIRECT_CLIENT_ID),
         client_secret: trimEnv(process.env.DIRECT_CLIENT_SECRET),
         redirect_uri: trimEnv(process.env.DIRECT_REDIRECT_URI),
+      })
+      return jsonResponse(200, payload, requestOrigin)
+    }
+
+    if (method === 'POST' && path === '/api/auth/direct/userinfo') {
+      const authHeader = event?.headers?.authorization || event?.headers?.Authorization || ''
+      const bearerToken =
+        typeof authHeader === 'string' && authHeader.toLowerCase().startsWith('bearer ')
+          ? authHeader.slice(7).trim()
+          : ''
+      const token = typeof body.token === 'string' && body.token ? body.token : bearerToken
+      if (!token) {
+        return jsonResponse(400, { error: 'Missing access token' }, requestOrigin)
+      }
+      const payload = await directUserInfo({
+        token,
+      })
+      return jsonResponse(200, payload, requestOrigin)
+    }
+
+    if (method === 'POST' && path === '/api/auth/direct/logout') {
+      const authHeader = event?.headers?.authorization || event?.headers?.Authorization || ''
+      const bearerToken =
+        typeof authHeader === 'string' && authHeader.toLowerCase().startsWith('bearer ')
+          ? authHeader.slice(7).trim()
+          : ''
+      const token = typeof body.token === 'string' && body.token ? body.token : bearerToken
+      if (!token) {
+        return jsonResponse(400, { error: 'Missing access token' }, requestOrigin)
+      }
+      const payload = await directForceLogout({
+        token,
+        client_id: trimEnv(process.env.DIRECT_CLIENT_ID),
+        client_secret: trimEnv(process.env.DIRECT_CLIENT_SECRET),
       })
       return jsonResponse(200, payload, requestOrigin)
     }
