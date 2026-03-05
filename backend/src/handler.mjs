@@ -91,6 +91,20 @@ export const handler = async (event) => {
       return jsonResponse(200, payload, requestOrigin)
     }
 
+    if (method === 'POST' && path === '/api/auth/direct/refresh') {
+      const refreshToken = typeof body.refreshToken === 'string' ? body.refreshToken : ''
+      if (!refreshToken) {
+        return jsonResponse(400, { error: 'Missing refresh token.' }, requestOrigin)
+      }
+      const payload = await directforceTokenRequest({
+        grant_type: 'refresh_token',
+        refresh_token: refreshToken,
+        client_id: trimEnv(process.env.DIRECT_CLIENT_ID),
+        client_secret: trimEnv(process.env.DIRECT_CLIENT_SECRET),
+      })
+      return jsonResponse(200, payload, requestOrigin)
+    }
+
     if (method === 'POST' && path === '/api/auth/direct/userinfo') {
       const token = readBearerToken(event, body)
       if (!token) {

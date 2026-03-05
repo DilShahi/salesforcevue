@@ -10,7 +10,7 @@ export const DIRECT_AUTH_CHANGED_EVENT = 'direct-auth-changed'
 type DirectTokenResponse = {
   access_token: string
   refresh_token?: string
-  id_token: string
+  id_token?: string
   scope?: string
   token_type: string
   expires_in: number
@@ -174,6 +174,37 @@ const fetchDirectForceToken = async (payload: Record<string, string>) => {
   return token
 }
 
+const fetchDirectRefreshToken = async (payload: Record<string, string>) => {
+  const response = await fetch(apiUrl('/api/auth/direct/refresh'), {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  })
+
+  const rawText = await response.text()
+  let data: Record<string, unknown> = {}
+  try {
+    data = rawText ? (JSON.parse(rawText) as Record<string, unknown>) : {}
+  } catch {
+    data = {}
+  }
+  if (!response.ok) {
+    const message =
+      typeof data.error_description === 'string'
+        ? data.error_description
+        : typeof data.error === 'string'
+          ? data.error
+          : 'Failed to refresh direct access token.'
+    throw new Error(message)
+  }
+
+  const token = data as unknown as DirectTokenResponse
+  if (!token.access_token || !token.token_type) {
+    throw new Error('Invalid token response from /api/auth/direct/refresh.')
+  }
+  return token
+}
+
 const mapTokenToSession = (
   token: DirectTokenResponse,
   state: string,
@@ -237,6 +268,56 @@ export const clearDirectSession = async () => {
   dispatchEvent(new CustomEvent(DIRECT_AUTH_CHANGED_EVENT))
 }
 
+const refreshDirectAccessToken = async () => {
+  const session = getDirectSession()
+  if (!session?.refreshToken) {
+    throw new Error('No Direct refresh token is available.')
+  }
+
+  const token = await fetchDirectRefreshToken({
+    refreshToken: session.refreshToken,
+  })
+
+  const updatedSession = mapTokenToSession(token, session.state, session.refreshToken)
+  saveDirectSession(updatedSession)
+  return updatedSession
+}
+
+const performDirectAuthorizedRequest = async (session: DirectAuthSession, path: string) => {
+  return fetch(apiUrl(path), {
+    method: 'GET',
+    headers: {
+      Authorization: `${session.tokenType || 'Bearer'} ${session.accessToken}`,
+      Accept: 'application/json',
+    },
+  })
+}
+
+const directApiFetch = async (path: string) => {
+  const session = getDirectSession()
+  if (!session?.accessToken) {
+    throw new Error('No Direct session found. Please sign in first.')
+  }
+
+  let response = await performDirectAuthorizedRequest(session, path)
+  if (response.status !== 401) {
+    return response
+  }
+
+  try {
+    const refreshedSession = await refreshDirectAccessToken()
+    response = await performDirectAuthorizedRequest(refreshedSession, path)
+    if (response.status === 401) {
+      await clearDirectSession()
+      throw new Error('Direct session expired. Please sign in again.')
+    }
+    return response
+  } catch {
+    await clearDirectSession()
+    throw new Error('Direct session expired. Please sign in again.')
+  }
+}
+
 const getLoggedInUserInfo = async (accessToken: string) => {
   const response = await fetch(apiUrl('/api/auth/direct/userinfo'), {
     method: 'POST',
@@ -283,18 +364,7 @@ export const handleDirectForceOAuthCallback = async (code: string, state: string
 }
 
 export const fetchDirectOrganizationList = async () => {
-  const session = getDirectSession()
-  if (!session?.accessToken) {
-    throw new Error('No Direct session found. Please sign in first.')
-  }
-
-  const response = await fetch(apiUrl('/api/direct/organization'), {
-    method: 'GET',
-    headers: {
-      Authorization: `${session.tokenType || 'Bearer'} ${session.accessToken}`,
-      Accept: 'application/json',
-    },
-  })
+  const response = await directApiFetch('/api/direct/organization')
 
   const payload = (await response.json().catch(() => [])) as unknown
   if (!response.ok) {
@@ -312,10 +382,6 @@ export const fetchDirectOrganizationUserList = async (
   domainId: string,
   options?: { limit?: number; offset?: number },
 ) => {
-  const session = getDirectSession()
-  if (!session?.accessToken) {
-    throw new Error('No Direct session found. Please sign in first.')
-  }
   if (!domainId) {
     throw new Error('Missing domain id.')
   }
@@ -325,13 +391,7 @@ export const fetchDirectOrganizationUserList = async (
   if (typeof options?.offset === 'number') query.set('offset', String(options.offset))
   const suffix = query.toString() ? `?${query.toString()}` : ''
 
-  const response = await fetch(apiUrl(`/api/direct/${encodeURIComponent(domainId)}/users${suffix}`), {
-    method: 'GET',
-    headers: {
-      Authorization: `${session.tokenType || 'Bearer'} ${session.accessToken}`,
-      Accept: 'application/json',
-    },
-  })
+  const response = await directApiFetch(`/api/direct/${encodeURIComponent(domainId)}/users${suffix}`)
 
   const payload = (await response.json().catch(() => ({}))) as unknown
   if (!response.ok) {
