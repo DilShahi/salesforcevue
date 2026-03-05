@@ -89,6 +89,7 @@ export const buildDirectAuthorizeUrl = () => {
   url.searchParams.set('scope', scopes)
   url.searchParams.set('state', buildOAuthState())
   url.searchParams.set('nonce', randomString(24))
+  url.searchParams.set('prompt', 'consent') // it is necessary to get refresh token
   return url.toString()
 }
 

@@ -119,9 +119,8 @@ For more guide you can study the following link:
 
 ```
 https://directdev.feel-on.com/ja/api/id_guide.html#linkage
-```
 
-curl -v \
- -H "Authorization: Bearer 18f68f2cabc00000_4c221b9e68d110692b43ba98402111422eaefa5c" \
- -H "Accept: application/json" \
- "https://restapi-directdev.feel-on.com/albero-app-server/users/me/openIdConnect"
+https://qiita.com/sugimon/items/a431435bf8974460c54f
+
+https://directdev.feel-on.com/ja/api/rest_api_spec.html#apis
+```
