@@ -10,10 +10,12 @@ const route = useRoute()
 const router = useRouter()
 
 const isLoading = ref(false)
+const isLoadingMore = ref(false)
 const errorMessage = ref('')
 const users = ref<DirectOrganizationUser[]>([])
 const limit = ref(50)
 const offset = ref(0)
+const hasMore = ref(true)
 
 const domainId = computed(() => String(route.params.domainId || ''))
 
@@ -48,28 +50,61 @@ const userId = (user: DirectOrganizationUser) => {
   return '-'
 }
 
-const loadUsers = async () => {
+const mergeUsers = (incoming: DirectOrganizationUser[]) => {
+  const map = new Map<string, DirectOrganizationUser>()
+  for (const user of users.value) {
+    map.set(userId(user), user)
+  }
+  for (const user of incoming) {
+    map.set(userId(user), user)
+  }
+  users.value = Array.from(map.values())
+}
+
+const loadUsers = async (mode: 'reset' | 'append' = 'reset') => {
   if (!domainId.value) {
     errorMessage.value = 'Missing domain id.'
     return
   }
 
-  isLoading.value = true
-  errorMessage.value = ''
+  if (mode === 'append') {
+    if (isLoadingMore.value || !hasMore.value) return
+    isLoadingMore.value = true
+  } else {
+    isLoading.value = true
+    errorMessage.value = ''
+    users.value = []
+    offset.value = 0
+    hasMore.value = true
+  }
+
   try {
-    users.value = await fetchDirectOrganizationUserList(domainId.value, {
+    const batch = await fetchDirectOrganizationUserList(domainId.value, {
       limit: limit.value,
       offset: offset.value,
     })
+
+    if (mode === 'append') {
+      mergeUsers(batch)
+    } else {
+      users.value = batch
+    }
+
+    offset.value += batch.length
+    hasMore.value = batch.length === limit.value
   } catch (error) {
     errorMessage.value =
       error instanceof Error ? error.message : 'Failed to fetch organization users.'
   } finally {
-    isLoading.value = false
+    if (mode === 'append') {
+      isLoadingMore.value = false
+    } else {
+      isLoading.value = false
+    }
   }
 }
 
-onMounted(loadUsers)
+onMounted(() => loadUsers('reset'))
 </script>
 
 <template>
@@ -91,7 +126,7 @@ onMounted(loadUsers)
         <button
           type="button"
           class="rounded-lg border border-slate-300 px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-100"
-          @click="loadUsers"
+          @click="loadUsers('reset')"
         >
           Refresh
         </button>
@@ -129,6 +164,19 @@ onMounted(loadUsers)
           </tr>
         </tbody>
       </table>
+    </div>
+
+    <div v-if="!isLoading && !errorMessage && users.length > 0" class="flex justify-center">
+      <button
+        v-if="hasMore"
+        type="button"
+        class="rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-60"
+        :disabled="isLoadingMore"
+        @click="loadUsers('append')"
+      >
+        {{ isLoadingMore ? 'Loading...' : 'Load More' }}
+      </button>
+      <p v-else class="text-sm text-slate-500">All users loaded.</p>
     </div>
   </section>
 </template>
