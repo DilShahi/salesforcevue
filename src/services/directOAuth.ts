@@ -31,6 +31,31 @@ type LoggedInUserInfo = {
   sub: string
 }
 
+export type DirectOrganization = {
+  domain_id: number
+  domain_id_str: string
+  domain_name: string
+  updated_at: number
+  role?: {
+    role_id: number
+    name: string
+    type: number
+  }
+}
+
+export type DirectOrganizationUser = {
+  user_id?: number | string
+  user_id_str?: string
+  name?: string
+  kana?: string
+  display_name?: string
+  email?: string
+  role_id?: number
+  last_used_at?: number
+  last_used_at_str?: string
+  [key: string]: unknown
+}
+
 const DIRECT = {
   clientId: ENV.direct.clientId,
   clientSecret: ENV.direct.clientSecret,
@@ -255,4 +280,78 @@ export const handleDirectForceOAuthCallback = async (code: string, state: string
   saveUserInfo(info)
   window.sessionStorage.removeItem(OAUTH_STATE_STORAGE_KEY)
   return token
+}
+
+export const fetchDirectOrganizationList = async () => {
+  const session = getDirectSession()
+  if (!session?.accessToken) {
+    throw new Error('No Direct session found. Please sign in first.')
+  }
+
+  const response = await fetch(apiUrl('/api/direct/organization'), {
+    method: 'GET',
+    headers: {
+      Authorization: `${session.tokenType || 'Bearer'} ${session.accessToken}`,
+      Accept: 'application/json',
+    },
+  })
+
+  const payload = (await response.json().catch(() => [])) as unknown
+  if (!response.ok) {
+    const message =
+      payload && typeof payload === 'object' && !Array.isArray(payload) && 'error' in payload
+        ? String((payload as Record<string, unknown>).error || '')
+        : 'Failed to fetch organizations.'
+    throw new Error(message || 'Failed to fetch organizations.')
+  }
+
+  return (Array.isArray(payload) ? payload : []) as DirectOrganization[]
+}
+
+export const fetchDirectOrganizationUserList = async (
+  domainId: string,
+  options?: { limit?: number; offset?: number },
+) => {
+  const session = getDirectSession()
+  if (!session?.accessToken) {
+    throw new Error('No Direct session found. Please sign in first.')
+  }
+  if (!domainId) {
+    throw new Error('Missing domain id.')
+  }
+
+  const query = new URLSearchParams()
+  if (typeof options?.limit === 'number') query.set('limit', String(options.limit))
+  if (typeof options?.offset === 'number') query.set('offset', String(options.offset))
+  const suffix = query.toString() ? `?${query.toString()}` : ''
+
+  const response = await fetch(apiUrl(`/api/direct/${encodeURIComponent(domainId)}/users${suffix}`), {
+    method: 'GET',
+    headers: {
+      Authorization: `${session.tokenType || 'Bearer'} ${session.accessToken}`,
+      Accept: 'application/json',
+    },
+  })
+
+  const payload = (await response.json().catch(() => ({}))) as unknown
+  if (!response.ok) {
+    const message =
+      payload && typeof payload === 'object' && !Array.isArray(payload) && 'error' in payload
+        ? String((payload as Record<string, unknown>).error || '')
+        : 'Failed to fetch organization users.'
+    throw new Error(message || 'Failed to fetch organization users.')
+  }
+
+  if (Array.isArray(payload)) {
+    return payload as DirectOrganizationUser[]
+  }
+  if (payload && typeof payload === 'object') {
+    const objectPayload = payload as Record<string, unknown>
+    if (Array.isArray(objectPayload.contents)) return objectPayload.contents as DirectOrganizationUser[]
+    if (Array.isArray(objectPayload.members)) return objectPayload.members as DirectOrganizationUser[]
+    if (Array.isArray(objectPayload.users)) return objectPayload.users as DirectOrganizationUser[]
+    if (Array.isArray(objectPayload.data)) return objectPayload.data as DirectOrganizationUser[]
+  }
+
+  return []
 }

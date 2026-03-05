@@ -9,6 +9,9 @@ import EventSummaryView from '@/views/EventSummaryView.vue'
 import DirectLayout from '@/layout/DirectLayout.vue'
 import DirectTalkRoomView from '@/views/DirectTalkRoomView.vue'
 import DirectOAuthCallbackView from '@/views/direct/OAuthCallbackView.vue'
+import DirectIndexView from '@/views/direct/IndexView.vue'
+import DirectUserView from '@/views/direct/UserView.vue'
+import DirectOrganizationView from '@/views/direct/OrganizationView.vue'
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -32,17 +35,32 @@ const router = createRouter({
       path: '/direct',
       name: 'directLayout',
       component: DirectLayout,
-      redirect: { name: 'directTalkRoom' },
+      redirect: { name: 'directIndex' },
       children: [
+        {
+          path: 'index',
+          name: 'directIndex',
+          component: DirectIndexView,
+        },
         {
           path: 'oauth/callback',
           name: 'directOAuthCallback',
           component: DirectOAuthCallbackView,
         },
         {
+          path: 'organization',
+          name: 'directOrganization',
+          component: DirectOrganizationView,
+        },
+        {
           path: 'talkroom',
           name: 'directTalkRoom',
           component: DirectTalkRoomView,
+        },
+        {
+          path: 'organization/:domainId/users',
+          name: 'directUserList',
+          component: DirectUserView,
         },
       ],
     },

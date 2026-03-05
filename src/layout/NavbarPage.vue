@@ -83,7 +83,7 @@ onBeforeUnmount(() => {
             Home
           </RouterLink>
           <RouterLink
-            :to="{ name: 'directTalkRoom' }"
+            :to="{ name: 'directIndex' }"
             class="text-sm font-medium text-slate-700 hover:text-slate-900"
           >
             Direct
