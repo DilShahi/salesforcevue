@@ -1,88 +1,86 @@
 <script setup lang="ts">
-import {
-  clearDirectSession,
-  DIRECT_AUTH_CHANGED_EVENT,
-  getDirectSession,
-  redirectToDirectLogin,
-} from '@/services/directOAuth'
-import { onBeforeUnmount, onMounted, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
+import {
+  clearSalesforceSession,
+  getSalesforceSession,
+  redirectToSalesforceLogin,
+} from '@/services/salesforceAuth'
 
 const router = useRouter()
 
-const isDirectLoggedIn = ref(false)
 const isMobileMenuOpen = ref(false)
+const isProfileMenuOpen = ref(false)
+const session = ref(getSalesforceSession())
 
-const refreshDirectAuthState = () => {
-  isDirectLoggedIn.value = Boolean(getDirectSession()?.accessToken)
+const isAuthenticated = computed(() => Boolean(session.value?.accessToken))
+
+const refreshSession = () => {
+  session.value = getSalesforceSession()
 }
 
 const handleSignIn = () => {
   try {
-    redirectToDirectLogin()
+    redirectToSalesforceLogin()
     isMobileMenuOpen.value = false
   } catch (error) {
     console.error(error)
-    alert('Direct login is not configured. Please check OAuth env variables.')
+    alert('Salesforce login is not configured. Please check OAuth env variables.')
   }
 }
 
-const handleLogout = async () => {
-  await clearDirectSession()
-  router.push({ name: 'directIndex' })
+const handleSignOut = () => {
+  clearSalesforceSession()
+  refreshSession()
   isMobileMenuOpen.value = false
+  isProfileMenuOpen.value = false
+  router.push({ name: 'salesforceIndex' })
 }
 
 onMounted(() => {
-  refreshDirectAuthState()
-  window.addEventListener(DIRECT_AUTH_CHANGED_EVENT, refreshDirectAuthState)
-  window.addEventListener('storage', refreshDirectAuthState)
+  refreshSession()
+  window.addEventListener('salesforce-auth-changed', refreshSession)
+  window.addEventListener('storage', refreshSession)
 })
 
 onBeforeUnmount(() => {
-  window.removeEventListener(DIRECT_AUTH_CHANGED_EVENT, refreshDirectAuthState)
-  window.removeEventListener('storage', refreshDirectAuthState)
+  window.removeEventListener('salesforce-auth-changed', refreshSession)
+  window.removeEventListener('storage', refreshSession)
 })
 </script>
+
 <template>
   <div class="min-h-screen bg-slate-50">
     <header class="border-b border-slate-200 bg-white">
       <nav class="mx-auto flex items-center justify-between px-4 py-3 sm:px-6 lg:px-8">
         <div class="flex items-center gap-6">
           <RouterLink
-            :to="{ name: 'directIndex' }"
+            :to="{ name: 'salesforceIndex' }"
             class="text-base font-semibold tracking-wide text-slate-900"
           >
-            Direct
+            Salesforce
           </RouterLink>
           <RouterLink
-            v-if="isDirectLoggedIn"
-            :to="{ name: 'directOrganization' }"
+            v-if="isAuthenticated"
+            :to="{ name: 'salesforceUsers' }"
             class="hidden text-sm font-medium text-slate-600 transition hover:text-slate-900 sm:block"
           >
-            Organization
-          </RouterLink>
-          <RouterLink
-            v-if="isDirectLoggedIn"
-            :to="{ name: 'directTalkRoom' }"
-            class="hidden text-sm font-medium text-slate-600 transition hover:text-slate-900 sm:block"
-          >
-            Talk Room
+            Users
           </RouterLink>
         </div>
 
-        <div class="hidden items-center sm:flex">
+        <div class="hidden items-center gap-3 sm:flex">
           <button
-            v-if="!isDirectLoggedIn"
-            @click="handleSignIn"
+            v-if="!isAuthenticated"
             type="button"
             class="rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-700"
+            @click="handleSignIn"
           >
             Sign In
           </button>
           <button
             v-else
-            @click="handleLogout"
+            @click="handleSignOut"
             type="button"
             class="rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-100"
           >
@@ -133,37 +131,29 @@ onBeforeUnmount(() => {
       <div v-if="isMobileMenuOpen" class="border-t border-slate-200 px-4 py-3 sm:hidden">
         <div class="flex flex-col gap-3">
           <RouterLink
-            v-if="isDirectLoggedIn"
-            :to="{ name: 'directOrganization' }"
+            v-if="isAuthenticated"
+            :to="{ name: 'users' }"
             class="text-sm font-medium text-slate-700"
             @click="isMobileMenuOpen = false"
           >
-            Organization
-          </RouterLink>
-          <RouterLink
-            v-if="isDirectLoggedIn"
-            :to="{ name: 'directTalkRoom' }"
-            class="text-sm font-medium text-slate-700"
-            @click="isMobileMenuOpen = false"
-          >
-            Talk Room
+            Users
           </RouterLink>
 
           <button
-            v-if="!isDirectLoggedIn"
-            @click="handleSignIn"
+            v-if="!isAuthenticated"
             type="button"
             class="w-full rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-700"
+            @click="handleSignIn"
           >
-            Sign In To Direct
+            Sign In
           </button>
           <button
             v-else
-            @click="handleLogout"
             type="button"
             class="w-full rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-100"
+            @click="handleSignOut"
           >
-            Logout
+            Sign Out
           </button>
         </div>
       </div>

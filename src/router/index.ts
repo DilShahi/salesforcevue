@@ -1,17 +1,18 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import HomeView from '../views/HomeView.vue'
 import AboutView from '../views/AboutView.vue'
-import { handleSalesforceOAuthCallback } from '@/services/salesforceAuth'
-import OAuthCallbackView from '@/views/OAuthCallbackView.vue'
-import UserListView from '@/views/UserListView.vue'
-import EventListView from '@/views/EventListView.vue'
-import EventSummaryView from '@/views/EventSummaryView.vue'
+import SalesforceOAuthCallbackView from '@/views/salesforce/OAuthCallbackView.vue'
+import SalesforceUserListView from '@/views/salesforce/UserListView.vue'
+import EventListView from '@/views/salesforce/EventListView.vue'
+import EventSummaryView from '@/views/salesforce/EventSummaryView.vue'
 import DirectLayout from '@/layout/DirectLayout.vue'
-import DirectTalkRoomView from '@/views/DirectTalkRoomView.vue'
+import DirectTalkRoomView from '@/views/direct/DirectTalkRoomView.vue'
 import DirectOAuthCallbackView from '@/views/direct/OAuthCallbackView.vue'
 import DirectIndexView from '@/views/direct/IndexView.vue'
 import DirectUserView from '@/views/direct/UserView.vue'
 import DirectOrganizationView from '@/views/direct/OrganizationView.vue'
+import SalesforceLayout from '@/layout/SalesforceLayout.vue'
+import SalesforceIndexView from '@/views/salesforce/IndexView.vue'
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -27,9 +28,37 @@ const router = createRouter({
       component: AboutView,
     },
     {
-      path: '/oauth/callback',
-      name: 'oauth-callback',
-      component: OAuthCallbackView,
+      path: '/salesforce',
+      name: 'salesforceLayout',
+      component: SalesforceLayout,
+      redirect: { name: 'salesforceIndex' },
+      children: [
+        {
+          path: 'index',
+          name: 'salesforceIndex',
+          component: SalesforceIndexView,
+        },
+        {
+          path: 'oauth/callback',
+          name: 'salesforceOAuthCallback',
+          component: SalesforceOAuthCallbackView,
+        },
+        {
+          path: 'users',
+          name: 'salesforceUsers',
+          component: SalesforceUserListView,
+        },
+        {
+          path: '/users/:userId/events',
+          name: 'salesforceUserEvent',
+          component: EventListView,
+        },
+        {
+          path: '/users/:userId/events/summary',
+          name: 'salesforceUserEventSummary',
+          component: EventSummaryView,
+        },
+      ],
     },
     {
       path: '/direct',
@@ -63,21 +92,6 @@ const router = createRouter({
           component: DirectUserView,
         },
       ],
-    },
-    {
-      path: '/users',
-      name: 'users',
-      component: UserListView,
-    },
-    {
-      path: '/users/:userId/events',
-      name: 'usersEvent',
-      component: EventListView,
-    },
-    {
-      path: '/users/:userId/events/summary',
-      name: 'usersEventSummary',
-      component: EventSummaryView,
     },
   ],
 })

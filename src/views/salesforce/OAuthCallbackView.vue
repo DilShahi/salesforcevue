@@ -11,7 +11,7 @@ onMounted(async () => {
   const state = String(route.query.state || '')
   try {
     await handleSalesforceOAuthCallback(code, state)
-    router.push({ name: 'users' })
+    router.push({ name: 'salesforceIndex' })
   } catch (error) {
     console.error('Salesforce OAuth callback processing failed.', error)
   }

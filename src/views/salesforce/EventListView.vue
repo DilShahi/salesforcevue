@@ -79,7 +79,7 @@ const goToSummary = async () => {
   )
 
   await router.push({
-    name: 'usersEventSummary',
+    name: 'salesforceUserEventSummary',
     params: { userId: userId.value },
     query: {
       userName: userName.value,

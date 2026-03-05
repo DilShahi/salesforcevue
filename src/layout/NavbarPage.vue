@@ -1,31 +1,15 @@
 <script setup lang="ts">
-import { RouterLink, useRouter } from 'vue-router'
-import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
+import { RouterLink } from 'vue-router'
+import { ref } from 'vue'
 import IconNotification from '@/components/icons/IconNotification.vue'
 import { ENV } from '@/config/env'
-import {
-  clearSalesforceSession,
-  getSalesforceSession,
-  redirectToSalesforceLogin,
-} from '@/services/salesforceAuth'
 import IconDownChevron from '@/components/icons/IconDownChevron.vue'
 import IconMenu from '@/components/icons/IconMenu.vue'
 
 const isMobileMenuOpen = ref(false)
 const isDropdownOpen = ref(false)
 const isMobileServicesOpen = ref(false)
-const isProfileMenuOpen = ref(false)
 const notificationCount = 5
-const session = ref(getSalesforceSession())
-const router = useRouter()
-
-const isAuthenticated = computed(() => Boolean(session.value?.accessToken))
-const profileName = computed(() => session.value?.state.split(':')[0] || 'Profile')
-const profileInitials = computed(() => profileName.value.charAt(0).toUpperCase())
-
-const refreshSession = () => {
-  session.value = getSalesforceSession()
-}
 
 const toggleMobileMenu = () => {
   isMobileMenuOpen.value = !isMobileMenuOpen.value
@@ -38,33 +22,7 @@ const closeMenus = () => {
   isMobileMenuOpen.value = false
   isDropdownOpen.value = false
   isMobileServicesOpen.value = false
-  isProfileMenuOpen.value = false
 }
-
-const handleSignIn = () => {
-  try {
-    redirectToSalesforceLogin()
-  } catch (error) {
-    console.error(error)
-    alert('Salesforce login is not configured. Please check OAuth env variables.')
-  }
-}
-
-const handleSignOut = () => {
-  clearSalesforceSession()
-  refreshSession()
-  closeMenus()
-  router.push({ name: 'home' })
-}
-
-onMounted(() => {
-  refreshSession()
-  window.addEventListener('salesforce-auth-changed', refreshSession)
-})
-
-onBeforeUnmount(() => {
-  window.removeEventListener('salesforce-auth-changed', refreshSession)
-})
 </script>
 <template>
   <header class="border-b border-slate-200 bg-white">
@@ -88,7 +46,10 @@ onBeforeUnmount(() => {
           >
             Direct
           </RouterLink>
-          <RouterLink to="/users" class="text-sm font-medium text-slate-700 hover:text-slate-900">
+          <RouterLink
+            :to="{ name: 'salesforceIndex' }"
+            class="text-sm font-medium text-slate-700 hover:text-slate-900"
+          >
             Salesforce
           </RouterLink>
 
@@ -131,42 +92,6 @@ onBeforeUnmount(() => {
             >
             <IconNotification />
           </button>
-
-          <button
-            v-if="!isAuthenticated"
-            type="button"
-            class="rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-700"
-            @click="handleSignIn"
-          >
-            Sign In
-          </button>
-
-          <div v-else class="relative">
-            <button
-              type="button"
-              class="flex items-center gap-2 rounded-lg border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-100"
-              @click="isProfileMenuOpen = !isProfileMenuOpen"
-            >
-              <span
-                class="inline-flex h-6 w-6 items-center justify-center rounded-full bg-slate-900 text-xs text-white"
-                >{{ profileInitials }}</span
-              >
-              {{ profileName }}
-            </button>
-
-            <div
-              v-if="isProfileMenuOpen"
-              class="absolute right-0 z-20 mt-2 w-40 rounded-lg border border-slate-200 bg-white py-2 shadow-lg"
-            >
-              <button
-                type="button"
-                class="block w-full px-4 py-2 text-left text-sm text-slate-700 hover:bg-slate-100"
-                @click="handleSignOut"
-              >
-                Sign Out
-              </button>
-            </div>
-          </div>
         </div>
 
         <button
@@ -188,14 +113,14 @@ onBeforeUnmount(() => {
           Home
         </RouterLink>
         <RouterLink
-          :to="{ name: 'directTalkRoom' }"
+          :to="{ name: 'directIndex' }"
           class="block rounded-md px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-100"
           @click="closeMenus"
         >
           Direct
         </RouterLink>
         <RouterLink
-          to="/users"
+          :to="{ name: 'salesforceIndex' }"
           class="block rounded-md px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-100"
           @click="closeMenus"
         >
@@ -247,23 +172,6 @@ onBeforeUnmount(() => {
               >{{ notificationCount }}</span
             >
             <IconNotification />
-          </button>
-
-          <button
-            v-if="!isAuthenticated"
-            type="button"
-            class="rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-700"
-            @click="handleSignIn"
-          >
-            Sign In
-          </button>
-          <button
-            v-else
-            type="button"
-            class="rounded-lg border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-100"
-            @click="handleSignOut"
-          >
-            Sign Out
           </button>
         </div>
       </div>

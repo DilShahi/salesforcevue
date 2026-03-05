@@ -128,14 +128,10 @@ const loadSummary = async () => {
   errorMessage.value = ''
 
   try {
-    const response = await fetchEventSummary(
-      userId,
-      events,
-      {
-        startDate: startDate.value,
-        endDate: endDate.value,
-      },
-    )
+    const response = await fetchEventSummary(userId, events, {
+      startDate: startDate.value,
+      endDate: endDate.value,
+    })
     summaryText.value = response.summaryText
     chartLabels.value = response.chartLabels
     chartCounts.value = response.chartCounts
@@ -181,7 +177,7 @@ onBeforeUnmount(() => {
         class="rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-100"
         @click="
           router.push({
-            name: 'usersEvent',
+            name: 'salesforceUserEvent',
             params: { userId: route.params.userId },
             query: { userName, startDate, endDate },
           })

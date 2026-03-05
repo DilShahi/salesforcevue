@@ -1,7 +1,11 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
-import { fetchSalesforceUsers, getSalesforceSession, type SalesforceUserRecord } from '@/services/salesforceAuth'
+import {
+  fetchSalesforceUsers,
+  getSalesforceSession,
+  type SalesforceUserRecord,
+} from '@/services/salesforceAuth'
 
 const users = ref<SalesforceUserRecord[]>([])
 const isLoading = ref(false)
@@ -81,7 +85,7 @@ const loadMitocoEvents = async () => {
 
   try {
     await router.push({
-      name: 'usersEvent',
+      name: 'salesforceUserEvent',
       params: { userId: selectedUser.value.Id },
       query: {
         startDate: startDate.value,
@@ -91,7 +95,8 @@ const loadMitocoEvents = async () => {
     })
     isMitocoModalOpen.value = false
   } catch (error) {
-    eventsErrorMessage.value = error instanceof Error ? error.message : 'Failed to open events page.'
+    eventsErrorMessage.value =
+      error instanceof Error ? error.message : 'Failed to open events page.'
   } finally {
     isEventsLoading.value = false
   }
@@ -218,6 +223,5 @@ const loadMitocoEvents = async () => {
         </form>
       </div>
     </div>
-
   </section>
 </template>
