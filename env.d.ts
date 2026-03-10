@@ -19,3 +19,9 @@ declare const __DIRECT_CLIENT_SECRET__: string
 declare const __DIRECT_REDIRECT_URL__: string
 declare const __DIRECT_REST_API__: string
 declare const __DIRECT_SCOPES__: string
+declare const __MS_CLIENT_ID__: string
+declare const __MS_CLIENT_SECRET__: string
+declare const __MS_TENANT_ID__: string
+declare const __MS_REDIRECT_URI__: string
+declare const __MS_SCOPES__: string
+declare const __MS_LOGIN_URL__: string

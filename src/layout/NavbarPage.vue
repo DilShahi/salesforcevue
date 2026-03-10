@@ -67,9 +67,12 @@ const closeMenus = () => {
               v-if="isDropdownOpen"
               class="absolute right-0 z-20 mt-2 w-44 rounded-lg border border-slate-200 bg-white py-2 shadow-lg"
             >
-              <a href="#" class="block px-4 py-2 text-sm text-slate-700 hover:bg-slate-100"
-                >Consulting</a
+              <RouterLink
+                :to="{ name: 'microsoftIndex' }"
+                class="block px-4 py-2 text-sm text-slate-700 hover:bg-slate-100"
               >
+                Microsoft
+              </RouterLink>
               <a href="#" class="block px-4 py-2 text-sm text-slate-700 hover:bg-slate-100"
                 >Development</a
               >
@@ -144,7 +147,7 @@ const closeMenus = () => {
               href="#"
               class="block rounded-md px-6 py-2 text-sm text-slate-600 hover:bg-slate-100 hover:text-slate-900"
             >
-              Consulting
+              Microsoft
             </a>
             <a
               href="#"

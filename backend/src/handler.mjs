@@ -8,6 +8,7 @@ import {
   directUserInfo,
   directforceTokenRequest,
 } from './services/direct.mjs'
+import { microsoftforceTokenRequest, microsoftRefreshTokenRequest } from './services/microsoft.mjs'
 import { proxySalesforceRequest, salesforceTokenRequest } from './services/salesforce.mjs'
 
 const resolveAllowedOrigin = (requestOrigin) => {
@@ -76,6 +77,29 @@ export const handler = async (event) => {
   }
 
   try {
+    if (method === 'POST' && path === '/api/auth/microsoft/token') {
+      const code = typeof body.code === 'string' ? body.code : ''
+      if (!code) {
+        return jsonResponse(400, { error: 'Missing authorization code.' }, requestOrigin)
+      }
+      const payload = await microsoftforceTokenRequest({
+        grant_type: 'authorization_code',
+        code,
+        client_id: trimEnv(process.env.MICROSOFT_CLIENT_ID),
+        redirect_uri: trimEnv(process.env.MICROSOFT_REDIRECT_URI),
+      })
+      return jsonResponse(200, payload, requestOrigin)
+    }
+
+    if (method === 'POST' && path === '/api/auth/microsoft/refresh') {
+      const refreshToken = typeof body.refreshToken === 'string' ? body.refreshToken : ''
+      if (!refreshToken) {
+        return jsonResponse(400, { error: 'Missing refresh token.' }, requestOrigin)
+      }
+      const payload = await microsoftRefreshTokenRequest({ refreshToken })
+      return jsonResponse(200, payload, requestOrigin)
+    }
+
     if (method === 'POST' && path === '/api/auth/direct/token') {
       const code = typeof body.code === 'string' ? body.code : ''
       if (!code) {

@@ -13,6 +13,9 @@ import DirectUserView from '@/views/direct/UserView.vue'
 import DirectOrganizationView from '@/views/direct/OrganizationView.vue'
 import SalesforceLayout from '@/layout/SalesforceLayout.vue'
 import SalesforceIndexView from '@/views/salesforce/IndexView.vue'
+import MicrosoftLayout from '@/layout/MicrosoftLayout.vue'
+import MicrosoftIndexView from '@/views/microsoft/IndexView.vue'
+import MicrosoftOAuthCallbackView from '@/views/microsoft/OAuthCallbackView.vue'
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -90,6 +93,24 @@ const router = createRouter({
           path: 'organization/:domainId/users',
           name: 'directUserList',
           component: DirectUserView,
+        },
+      ],
+    },
+    {
+      path: '/microsoft',
+      name: 'microsoftLayout',
+      component: MicrosoftLayout,
+      redirect: { name: 'microsoftIndex' },
+      children: [
+        {
+          path: 'index',
+          name: 'microsoftIndex',
+          component: MicrosoftIndexView,
+        },
+        {
+          path: 'oauth/callback',
+          name: 'microsoftOAuthCallback',
+          component: MicrosoftOAuthCallbackView,
         },
       ],
     },

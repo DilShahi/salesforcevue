@@ -23,6 +23,12 @@ export default defineConfig(({ mode }) => {
       __DIRECT_REDIRECT_URL__: JSON.stringify(env.DIRECT_REDIRECT_URL ?? ''),
       __DIRECT_REST_API__: JSON.stringify(env.DIRECT_REST_API ?? ''),
       __DIRECT_SCOPES__: JSON.stringify(env.DIRECT_SCOPES ?? 'openid offline_access profile email'),
+      __MS_CLIENT_ID__: JSON.stringify(env.MICROSOFT_CLIENT_ID ?? ''),
+      __MS_CLIENT_SECRET__: JSON.stringify(env.MICROSOFT_CLIENT_SECRET ?? ''),
+      __MS_TENANT_ID__: JSON.stringify(env.MICROSOFT_TENANT_ID ?? ''),
+      __MS_REDIRECT_URI__: JSON.stringify(env.MICROSOFT_REDIRECT_URI ?? ''),
+      __MS_SCOPES__: JSON.stringify(env.MICROSOFT_SCOPES ?? 'user.read'),
+      __MS_LOGIN_URL__: JSON.stringify(env.MICROSOFT_LOGIN_URL ?? 'https://login.microsoftonline.com'),
     },
     resolve: {
       alias: {

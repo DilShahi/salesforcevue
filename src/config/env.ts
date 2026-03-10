@@ -15,4 +15,12 @@ export const ENV = {
     restApi: __DIRECT_REST_API__.trim(),
     scopes: __DIRECT_SCOPES__.trim(),
   },
+  microsoft: {
+    clientId: __MS_CLIENT_ID__.trim(),
+    clientSecret: __MS_CLIENT_SECRET__.trim(),
+    tenantId: __MS_TENANT_ID__.trim(),
+    redirectUrl: __MS_REDIRECT_URI__.trim(),
+    scopes: __MS_SCOPES__.trim(),
+    loginUrl: __MS_LOGIN_URL__.trim(),
+  },
 }
